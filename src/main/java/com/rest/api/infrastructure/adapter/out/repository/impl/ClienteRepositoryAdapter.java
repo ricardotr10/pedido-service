@@ -6,6 +6,8 @@ import com.rest.api.infrastructure.adapter.out.entity.ClienteEntity;
 import com.rest.api.infrastructure.adapter.out.repository.ClienteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -13,6 +15,14 @@ import java.util.Optional;
 public class ClienteRepositoryAdapter implements ClienteRepositoryPort {
     
     private final ClienteRepository clienteRepository;
+    
+    @Override
+    public List<Cliente> findAllByIds(List<String> ids) {
+        return clienteRepository.findAllById(ids)
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
     
     @Override
     public Optional<Cliente> findById(String id) {

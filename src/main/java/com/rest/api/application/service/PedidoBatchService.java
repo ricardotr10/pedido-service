@@ -1,9 +1,8 @@
 package com.rest.api.application.service;
 
-import com.rest.api.application.dto.CargaPedidosResponse;
-import com.rest.api.application.dto.ErrorDetalle;
-import com.rest.api.domain.model.Pedido;
-import com.rest.api.domain.port.out.PedidoRepositoryPort;
+import com.rest.api.application.dto.*;
+import com.rest.api.domain.model.*;
+import com.rest.api.domain.port.out.*;
 import com.rest.api.domain.service.PedidoValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,58 +17,95 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PedidoBatchService {
-    
+
     private final PedidoValidator validator;
     private final PedidoRepositoryPort pedidoRepository;
-    
+    private final ClienteRepositoryPort clienteRepository;
+    private final ZonaRepositoryPort zonaRepository;
+
     @Value("${app.batch.size:500}")
     private int batchSize;
-    
+
     @Transactional
     public CargaPedidosResponse procesarPedidos(List<Pedido> pedidos) {
-        log.info("Iniciando procesamiento batch de {} pedidos", pedidos.size());
-        
-        List<Pedido> pedidosValidos = new ArrayList<>();
+
+        List<Pedido> validos = new ArrayList<>();
         List<ErrorDetalle> errores = new ArrayList<>();
         Map<String, List<Integer>> erroresPorTipo = new HashMap<>();
-        
-        int numeroLinea = 2;
-        
-        for (Pedido pedido : pedidos) {
-            Optional<PedidoValidator.ErrorType> errorOpt = validator.validar(pedido);
-            
-            if (errorOpt.isEmpty()) {
-                pedidosValidos.add(pedido);
+
+        Set<String> numerosVistos = new HashSet<>();
+
+        Map<String, Cliente> clientes = clienteRepository.findAllByIds(
+                pedidos.stream().map(Pedido::getClienteId).distinct().toList()
+        ).stream().collect(Collectors.toMap(Cliente::getId, c -> c));
+
+        Map<String, Zona> zonas = zonaRepository.findAllByIds(
+                pedidos.stream().map(Pedido::getZonaId).distinct().toList()
+        ).stream().collect(Collectors.toMap(Zona::getId, z -> z));
+
+        Set<String> existentesEnBd = pedidoRepository.findAllByNumeroPedidoIn(
+                pedidos.stream().map(Pedido::getNumeroPedido).collect(Collectors.toSet())
+        );
+
+        int linea = 2;
+
+        for (Pedido p : pedidos) {
+
+            if (!numerosVistos.add(p.getNumeroPedido()) ||
+                existentesEnBd.contains(p.getNumeroPedido())) {
+
+                addError("DUPLICADO", linea, errores, erroresPorTipo);
+                linea++;
+                continue;
+            }
+
+            Optional<PedidoValidator.ErrorType> error =
+                    validator.validar(p, clientes, zonas);
+
+            if (error.isPresent()) {
+                addError(error.get().name(), linea, errores, erroresPorTipo);
             } else {
-                String errorType = errorOpt.get().name();
-                errores.add(ErrorDetalle.builder()
-                    .linea(numeroLinea)
-                    .motivo(errorType)
-                    .build());
-                erroresPorTipo.computeIfAbsent(errorType, k -> new ArrayList<>()).add(numeroLinea);
+                validos.add(p);
             }
-            numeroLinea++;
+
+            linea++;
         }
-        
+
         int guardados = 0;
-        if (!pedidosValidos.isEmpty()) {
-            for (int i = 0; i < pedidosValidos.size(); i += batchSize) {
-                int end = Math.min(i + batchSize, pedidosValidos.size());
-                List<Pedido> batch = pedidosValidos.subList(i, end);
-                pedidoRepository.saveAll(batch);
-                guardados += batch.size();
-            }
+
+        for (int i = 0; i < validos.size(); i += batchSize) {
+            List<Pedido> batch =
+                    validos.subList(i, Math.min(i + batchSize, validos.size()));
+
+            pedidoRepository.saveAll(batch);
+            guardados += batch.size();
         }
-        
-        Map<String, Long> erroresAgrupados = erroresPorTipo.entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey, e -> (long) e.getValue().size()));
-        
+
+        Map<String, Long> agrupados = erroresPorTipo.entrySet()
+                .stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> (long) e.getValue().size()
+                ));
+
         return CargaPedidosResponse.builder()
-            .totalProcesados(pedidos.size())
-            .guardados(guardados)
-            .conError(errores.size())
-            .errores(errores)
-            .erroresAgrupados(erroresAgrupados)
-            .build();
+                .totalProcesados(pedidos.size())
+                .guardados(guardados)
+                .conError(errores.size())
+                .errores(errores)
+                .erroresAgrupados(agrupados)
+                .build();
+    }
+
+    private void addError(String tipo, int linea,
+                          List<ErrorDetalle> errores,
+                          Map<String, List<Integer>> map) {
+
+        errores.add(ErrorDetalle.builder()
+                .linea(linea)
+                .motivo(tipo)
+                .build());
+
+        map.computeIfAbsent(tipo, k -> new ArrayList<>()).add(linea);
     }
 }

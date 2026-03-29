@@ -1,43 +1,57 @@
-CREATE TABLE IF NOT EXISTS clientes (
+-- =========================
+-- TABLA CLIENTES
+-- =========================
+CREATE TABLE clientes (
     id VARCHAR PRIMARY KEY,
-    activo BOOLEAN NOT NULL DEFAULT true
+    activo BOOLEAN NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS zonas (
+-- =========================
+-- TABLA ZONAS
+-- =========================
+CREATE TABLE zonas (
     id VARCHAR PRIMARY KEY,
-    soporte_refrigeracion BOOLEAN NOT NULL DEFAULT false
+    soporte_refrigeracion BOOLEAN NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS pedidos (
+-- =========================
+-- TABLA PEDIDOS
+-- =========================
+CREATE TABLE pedidos (
     id UUID PRIMARY KEY,
-    numero_pedido VARCHAR(50) UNIQUE NOT NULL,
+    numero_pedido VARCHAR NOT NULL UNIQUE,
     cliente_id VARCHAR NOT NULL,
     zona_id VARCHAR NOT NULL,
     fecha_entrega DATE NOT NULL,
-    estado VARCHAR(20) NOT NULL CHECK (estado IN ('PENDIENTE', 'CONFIRMADO', 'ENTREGADO')),
+    estado VARCHAR NOT NULL CHECK (estado IN ('PENDIENTE','CONFIRMADO','ENTREGADO')),
     requiere_refrigeracion BOOLEAN NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS cargas_idempotencia (
+-- 🔥 ÍNDICE IMPORTANTE (requisito técnico)
+CREATE INDEX idx_pedidos_estado_fecha 
+ON pedidos (estado, fecha_entrega);
+
+-- =========================
+-- TABLA IDEMPOTENCIA
+-- =========================
+CREATE TABLE cargas_idempotencia (
     id UUID PRIMARY KEY,
-    idempotency_key VARCHAR(255) NOT NULL,
-    archivo_hash VARCHAR(64) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    idempotency_key VARCHAR NOT NULL,
+    archivo_hash VARCHAR NOT NULL,
+    response_json TEXT, -- 🔥 importante para devolver misma respuesta
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(idempotency_key, archivo_hash)
 );
 
-CREATE INDEX IF NOT EXISTS idx_pedidos_estado_fecha ON pedidos(estado, fecha_entrega);
-CREATE INDEX IF NOT EXISTS idx_pedidos_numero_pedido ON pedidos(numero_pedido);
-CREATE INDEX IF NOT EXISTS idx_pedidos_cliente_id ON pedidos(cliente_id);
-
+-- =========================
+-- DATOS DE PRUEBA
+-- =========================
 INSERT INTO clientes (id, activo) VALUES 
-    ('CLI-123', true),
-    ('CLI-999', true)
-ON CONFLICT (id) DO NOTHING;
+('CLI-123', true),
+('CLI-999', true);
 
 INSERT INTO zonas (id, soporte_refrigeracion) VALUES 
-    ('ZONA1', true),
-    ('ZONA5', false)
-ON CONFLICT (id) DO NOTHING;
+('ZONA1', true),
+('ZONA5', false);

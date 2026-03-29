@@ -1,10 +1,7 @@
 package com.rest.api.infrastructure.adapter.out.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -15,22 +12,25 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class IdempotenciaEntity {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    
+
     @Column(name = "idempotency_key", nullable = false)
     private String idempotencyKey;
-    
+
     @Column(name = "archivo_hash", nullable = false)
     private String archivoHash;
-    
+
+    @Column(name = "response_json", columnDefinition = "TEXT")
+    private String responseJson;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
-    
+
     @PrePersist
-    protected void onCreate() {
+    void onCreate() {
         createdAt = LocalDateTime.now();
     }
 }

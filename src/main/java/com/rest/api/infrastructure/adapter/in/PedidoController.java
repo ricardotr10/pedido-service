@@ -1,101 +1,131 @@
 package com.rest.api.infrastructure.adapter.in;
 
-import com.rest.api.application.dto.CargaPedidosResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rest.api.application.dto.*;
 import com.rest.api.application.service.PedidoBatchService;
-import com.rest.api.domain.model.Idempotencia;
-import com.rest.api.domain.model.Pedido;
+import com.rest.api.domain.model.*;
 import com.rest.api.domain.port.out.IdempotenciaRepositoryPort;
 import com.rest.api.util.HashUtil;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.apache.commons.csv.*;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
-@Slf4j
 @RestController
 @RequestMapping("/pedidos")
 @RequiredArgsConstructor
-@Tag(name = "Pedidos", description = "Endpoint para carga de pedidos")
 public class PedidoController {
-    
-    private final PedidoBatchService pedidoBatchService;
-    private final IdempotenciaRepositoryPort idempotenciaRepository;
+
+    private final PedidoBatchService service;
+    private final IdempotenciaRepositoryPort repo;
     private final HashUtil hashUtil;
-    
+    private final ObjectMapper mapper = new ObjectMapper();
+
     @PostMapping(value = "/cargar", consumes = "multipart/form-data")
-    @Operation(summary = "Cargar pedidos desde archivo CSV")
-    public ResponseEntity<CargaPedidosResponse> cargarPedidos(
+    public ResponseEntity<CargaPedidosResponse> cargar(
             @RequestParam("file") MultipartFile file,
-            @RequestHeader("Idempotency-Key") String idempotencyKey) throws Exception {
-        
-        log.info("Recibiendo carga de pedidos - IdempotencyKey: {}", idempotencyKey);
-        
-        String fileHash = hashUtil.calcularHash(file.getBytes());
-        
-        if (idempotenciaRepository.existsByIdempotencyKeyAndArchivoHash(idempotencyKey, fileHash)) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(CargaPedidosResponse.builder()
-                    .totalProcesados(0)
-                    .guardados(0)
-                    .conError(0)
-                    .errores(new ArrayList<>())
-                    .erroresAgrupados(new java.util.HashMap<>())
-                    .build());
+            @RequestHeader("Idempotency-Key") String key) throws Exception {
+
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException("Idempotency-Key requerido");
         }
-        
-        List<Pedido> pedidos = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
-            
-            String line;
-            boolean isFirstLine = true;
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            
-            while ((line = reader.readLine()) != null) {
-                if (isFirstLine) {
-                    isFirstLine = false;
-                    continue;
-                }
-                
-                String[] fields = line.split(",");
-                if (fields.length < 6) continue;
-                
-                Pedido pedido = Pedido.builder()
-                    .id(UUID.randomUUID())
-                    .numeroPedido(fields[0].trim())
-                    .clienteId(fields[1].trim())
-                    .fechaEntrega(LocalDate.parse(fields[2].trim(), formatter))
-                    .estado(Pedido.EstadoPedido.valueOf(fields[3].trim()))
-                    .zonaId(fields[4].trim())
-                    .requiereRefrigeracion(Boolean.parseBoolean(fields[5].trim()))
-                    .build();
-                
-                pedidos.add(pedido);
-            }
+
+        String hash = hashUtil.calcularHash(file.getBytes());
+
+        Optional<Idempotencia> existente =
+                repo.findByIdempotencyKeyAndArchivoHash(key, hash);
+
+        if (existente.isPresent()) {
+            return ResponseEntity.ok(
+                    mapper.readValue(existente.get().getResponseJson(), CargaPedidosResponse.class)
+            );
         }
-        
-        CargaPedidosResponse response = pedidoBatchService.procesarPedidos(pedidos);
-        
-        Idempotencia idempotencia = Idempotencia.builder()
-            .id(UUID.randomUUID())
-            .idempotencyKey(idempotencyKey)
-            .archivoHash(fileHash)
-            .build();
-        idempotenciaRepository.save(idempotencia);
-        
+
+        ParseResult parseResult = parseCsvSeguro(file);
+
+        CargaPedidosResponse response =
+                service.procesarPedidos(parseResult.validos);
+
+        List<ErrorDetalle> todos = new ArrayList<>(response.getErrores());
+        todos.addAll(parseResult.errores);
+
+        response.setErrores(todos);
+        response.setConError(todos.size());
+
+        response.setTotalProcesados(
+                parseResult.validos.size() + parseResult.errores.size()
+        );
+
+        Map<String, Long> agrupados = todos.stream()
+                .collect(Collectors.groupingBy(
+                        ErrorDetalle::getMotivo,
+                        Collectors.counting()
+                ));
+
+        response.setErroresAgrupados(agrupados);
+
+        repo.save(Idempotencia.builder()
+                .id(UUID.randomUUID())
+                .idempotencyKey(key)
+                .archivoHash(hash)
+                .responseJson(mapper.writeValueAsString(response))
+                .build());
+
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+
+    private ParseResult parseCsvSeguro(MultipartFile file) throws Exception {
+
+        List<Pedido> pedidos = new ArrayList<>();
+        List<ErrorDetalle> errores = new ArrayList<>();
+
+        try (Reader reader = new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8);
+             CSVParser parser = new CSVParser(reader,
+                     CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrim())) {
+
+            int linea = 2;
+
+            for (CSVRecord r : parser) {
+
+                try {
+                    Pedido.EstadoPedido estado;
+
+                    try {
+                        estado = Pedido.EstadoPedido.valueOf(r.get("estado"));
+                    } catch (Exception e) {
+                        estado = null;
+                    }
+
+                    pedidos.add(Pedido.builder()
+                            .id(UUID.randomUUID())
+                            .numeroPedido(r.get("numeroPedido"))
+                            .clienteId(r.get("clienteId"))
+                            .fechaEntrega(LocalDate.parse(r.get("fechaEntrega")))
+                            .estado(estado)
+                            .zonaId(r.get("zonaEntrega"))
+                            .requiereRefrigeracion(Boolean.parseBoolean(r.get("requiereRefrigeracion")))
+                            .build());
+
+                } catch (Exception e) {
+                    errores.add(ErrorDetalle.builder()
+                            .linea(linea)
+                            .motivo("FORMATO_INVALIDO")
+                            .build());
+                }
+
+                linea++;
+            }
+        }
+
+        return new ParseResult(pedidos, errores);
+    }
+
+    private record ParseResult(List<Pedido> validos, List<ErrorDetalle> errores) {}
 }
