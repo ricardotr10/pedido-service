@@ -1,0 +1,16 @@
+package com.rest.api.application.dto;
+
+import lombok.Builder;
+import lombok.Data;
+import java.util.List;
+import java.util.Map;
+
+@Data
+@Builder
+public class CargaPedidosResponse {
+    private Integer totalProcesados;
+    private Integer guardados;
+    private Integer conError;
+    private List<ErrorDetalle> errores;
+    private Map<String, Long> erroresAgrupados;
+}
