@@ -56,7 +56,7 @@ public class PedidoRepositoryAdapter implements PedidoRepositoryPort {
     
     private PedidoEntity toEntity(Pedido domain) {
         return PedidoEntity.builder()
-            .id(domain.getId())
+        	.id(null)
             .numeroPedido(domain.getNumeroPedido())
             .clienteId(domain.getClienteId())
             .zonaId(domain.getZonaId())

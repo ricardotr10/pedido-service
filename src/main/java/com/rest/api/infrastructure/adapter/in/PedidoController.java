@@ -74,7 +74,6 @@ public class PedidoController {
         // 🔥 Idempotencia segura (concurrencia)
         try {
             repo.save(Idempotencia.builder()
-                    .id(UUID.randomUUID())
                     .idempotencyKey(key)
                     .archivoHash(hash)
                     .responseJson(mapper.writeValueAsString(response))
