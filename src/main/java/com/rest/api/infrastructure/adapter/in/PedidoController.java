@@ -71,12 +71,25 @@ public class PedidoController {
 
         response.setErroresAgrupados(agrupados);
 
-        repo.save(Idempotencia.builder()
-                .id(UUID.randomUUID())
-                .idempotencyKey(key)
-                .archivoHash(hash)
-                .responseJson(mapper.writeValueAsString(response))
-                .build());
+        // 🔥 Idempotencia segura (concurrencia)
+        try {
+            repo.save(Idempotencia.builder()
+                    .id(UUID.randomUUID())
+                    .idempotencyKey(key)
+                    .archivoHash(hash)
+                    .responseJson(mapper.writeValueAsString(response))
+                    .build());
+        } catch (Exception e) {
+            Optional<Idempotencia> retry =
+                    repo.findByIdempotencyKeyAndArchivoHash(key, hash);
+
+            if (retry.isPresent()) {
+                return ResponseEntity.ok(
+                        mapper.readValue(retry.get().getResponseJson(), CargaPedidosResponse.class)
+                );
+            }
+            throw e;
+        }
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -89,6 +102,22 @@ public class PedidoController {
         try (Reader reader = new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8);
              CSVParser parser = new CSVParser(reader,
                      CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrim())) {
+
+            // 🔥 Validar headers
+            List<String> headers = parser.getHeaderNames();
+
+            List<String> expected = List.of(
+                    "numeroPedido",
+                    "clienteId",
+                    "fechaEntrega",
+                    "estado",
+                    "zonaEntrega",
+                    "requiereRefrigeracion"
+            );
+
+            if (!headers.containsAll(expected)) {
+                throw new IllegalArgumentException("CSV inválido: columnas incorrectas");
+            }
 
             int linea = 2;
 
