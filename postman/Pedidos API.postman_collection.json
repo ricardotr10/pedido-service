@@ -1,0 +1,153 @@
+{
+  "info": {
+    "name": "Pedidos API - Carga CSV",
+    "description": "Colección para probar el endpoint de carga masiva de pedidos",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Carga exitosa - CSV válido",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "carga-exitosa-{{$timestamp}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "../samples/v1_pedidos_validos.csv"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8080/pedidos/cargar",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["pedidos", "cargar"]
+        }
+      }
+    },
+    {
+      "name": "2. Carga con errores - CSV inválido",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "carga-errores-{{$timestamp}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "../samples/v2_pedidos_con_errores.csv"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8080/pedidos/cargar",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["pedidos", "cargar"]
+        }
+      }
+    },
+    {
+      "name": "3. Prueba de idempotencia - Misma key",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "idempotencia-fija-001",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "../samples/v3_pedidos_idempotencia.csv"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8080/pedidos/cargar",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["pedidos", "cargar"]
+        }
+      }
+    },
+    {
+      "name": "4. Sin Idempotency-Key (debe fallar)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "../samples/v1_pedidos_validos.csv"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8080/pedidos/cargar",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["pedidos", "cargar"]
+        }
+      }
+    },
+    {
+      "name": "5. Extra - Carga masiva 1000 registros",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "carga-masiva-{{$timestamp}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "../samples/v4_pedidos_validos_1000.csv"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8080/pedidos/cargar",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["pedidos", "cargar"]
+        }
+      }
+    }
+  ]
+}
