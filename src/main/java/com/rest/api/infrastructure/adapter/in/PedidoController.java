@@ -132,7 +132,6 @@ public class PedidoController {
                     }
 
                     pedidos.add(Pedido.builder()
-                            .id(UUID.randomUUID())
                             .numeroPedido(r.get("numeroPedido"))
                             .clienteId(r.get("clienteId"))
                             .fechaEntrega(LocalDate.parse(r.get("fechaEntrega")))

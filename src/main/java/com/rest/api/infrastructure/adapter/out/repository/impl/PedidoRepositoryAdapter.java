@@ -61,7 +61,9 @@ public class PedidoRepositoryAdapter implements PedidoRepositoryPort {
             .clienteId(domain.getClienteId())
             .zonaId(domain.getZonaId())
             .fechaEntrega(domain.getFechaEntrega())
-            .estado(PedidoEntity.EstadoPedido.valueOf(domain.getEstado().name()))
+            .estado(domain.getEstado() != null 
+            ? PedidoEntity.EstadoPedido.valueOf(domain.getEstado().name())
+            : null)
             .requiereRefrigeracion(domain.getRequiereRefrigeracion())
             .build();
     }
