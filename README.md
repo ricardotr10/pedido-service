@@ -1,5 +1,12 @@
 # Pedido Service - Procesador Batch
 
+## 📌 Descripción
+
+Microservicio desarrollado en **Java 17 + Spring Boot 3** para la carga masiva de pedidos desde un archivo CSV.
+Implementa **arquitectura hexagonal**, validaciones de negocio, procesamiento eficiente en batch e **idempotencia** para evitar duplicidad de operaciones.
+
+---
+
 ## Instrucciones de Ejecución
 
 ### Requisitos
