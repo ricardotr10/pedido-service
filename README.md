@@ -55,6 +55,9 @@ app.batch.size: 500  # Configurable entre 500-1000
 ```
 
 ## Proceso
+
+UBICACION CSV: https://github.com/ricardotr10/pedido-service/tree/main/samples
+
 1. Lectura streaming del CSV (no carga completa en memoria)
 
 2. Carga de catálogos en una consulta (findAllByIds para clientes y zonas)
@@ -66,6 +69,9 @@ app.batch.size: 500  # Configurable entre 500-1000
 5. Inserción por lotes con saveAll cada N registros
 
 # Colección Postman
+
+UBICACION Postman: https://github.com/ricardotr10/pedido-service/tree/main/postman
+
 Importar: postman/Pedidos Api.postman_collection.json
 
 ## Pruebas
