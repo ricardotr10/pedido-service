@@ -11,6 +11,7 @@
 1. Crear base de datos:
 ```sql
 CREATE DATABASE pedidos_db;
+```
 
 2. Configurar application.yml:
 ```yaml
@@ -19,13 +20,17 @@ spring:
     url: jdbc:postgresql://localhost:5432/pedidos_db
     username: postgres
     password: 1234
+```
 
 3. Ejecutar:
 
 ```cmd
 mvn clean install
+```
+
 ```cmd
 mvn spring-boot:run
+```
 
 ## Verificacion 
 
@@ -40,6 +45,7 @@ OpenAPI JSON: http://localhost:8080/v3/api-docs
 Configuración
 ```yaml
 app.batch.size: 500  # Configurable entre 500-1000
+```
 
 ## Proceso
 1. Lectura streaming del CSV (no carga completa en memoria)
