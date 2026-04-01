@@ -9,6 +9,5 @@ public interface ZonaRepositoryPort {
     Optional<Zona> findById(String id);
     boolean existsById(String id);
 
-    // ✅ NUEVO
     List<Zona> findAllByIds(List<String> ids);
 }

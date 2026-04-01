@@ -47,7 +47,6 @@ class PedidoBatchServiceTest {
 
     @BeforeEach
     void setup() throws Exception {
-        // 🔥 setear batchSize manual (porque @Value no funciona en test)
         Field field = PedidoBatchService.class.getDeclaredField("batchSize");
         field.setAccessible(true);
         field.set(service, 500);

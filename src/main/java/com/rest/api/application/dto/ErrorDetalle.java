@@ -7,8 +7,8 @@ import lombok.NoArgsConstructor;
 
 @Data
 @Builder
-@NoArgsConstructor  // ← Agregar esto
-@AllArgsConstructor // ← Agregar esto
+@NoArgsConstructor
+@AllArgsConstructor
 public class ErrorDetalle {
     private Integer linea;
     private String motivo;

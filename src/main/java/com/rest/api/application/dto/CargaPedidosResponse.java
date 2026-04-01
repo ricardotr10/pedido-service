@@ -10,8 +10,8 @@ import java.util.Map;
 
 @Data
 @Builder
-@NoArgsConstructor  // ← Agregar esto
-@AllArgsConstructor // ← Agregar esto
+@NoArgsConstructor
+@AllArgsConstructor
 public class CargaPedidosResponse {
     private Integer totalProcesados;
     private Integer guardados;
